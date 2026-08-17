@@ -47,3 +47,6 @@ jobs:
           cd environments/local
           terraform init -backend=false
           terraform validate
+
+      - name: Terraform Module Tests
+        run: make test-unit
