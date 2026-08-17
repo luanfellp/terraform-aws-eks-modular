@@ -1,4 +1,4 @@
-# Modular AWS EKS Infrastructure with Terraform & MiniStack
+# Infraestrutura Modular AWS EKS com Terraform e MiniStack
 
 ![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.7-623CE4?logo=terraform&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-EKS-326CE5?logo=kubernetes&logoColor=white)
