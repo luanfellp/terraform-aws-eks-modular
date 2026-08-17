@@ -13,7 +13,7 @@ KUBE_CONTEXT ?= ministack-local-k8s
 K8S_MANIFEST ?= k8s/app-demo.yaml
 K8S_NAMESPACE ?= demo
 
-.PHONY: up down init plan apply destroy kubeconfig deploy-app status fmt fmt-check lint validate test
+.PHONY: up down init plan apply destroy kubeconfig deploy-app status fmt fmt-check lint validate test-unit test
 
 up:
 	@echo "Iniciando MiniStack..."
@@ -113,4 +113,10 @@ validate:
 	terraform -chdir=$(ENV_DIR) init -backend=false
 	terraform -chdir=$(ENV_DIR) validate
 
-test: fmt-check lint validate
+test-unit:
+	terraform -chdir=modules/vpc init -backend=false -input=false -lockfile=readonly
+	terraform -chdir=modules/vpc test
+	terraform -chdir=modules/eks init -backend=false -input=false -lockfile=readonly
+	terraform -chdir=modules/eks test
+
+test: fmt-check lint validate test-unit
