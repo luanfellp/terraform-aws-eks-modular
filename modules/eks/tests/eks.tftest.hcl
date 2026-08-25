@@ -46,6 +46,22 @@ run "creates_default_eks_topology" {
     condition     = contains(aws_eks_node_group.main.instance_types, "t3.medium")
     error_message = "Default node group should use t3.medium instances."
   }
+
+  assert {
+    condition = (
+      aws_eks_cluster.main.vpc_config[0].endpoint_private_access &&
+      !aws_eks_cluster.main.vpc_config[0].endpoint_public_access
+    )
+    error_message = "The default cluster endpoint should be private-only."
+  }
+
+  assert {
+    condition = alltrue([
+      for log_type in ["api", "audit", "authenticator", "controllerManager", "scheduler"] :
+      contains(aws_eks_cluster.main.enabled_cluster_log_types, log_type)
+    ])
+    error_message = "All EKS control plane log types should be enabled by default."
+  }
 }
 
 run "supports_custom_node_group_configuration" {
@@ -84,6 +100,48 @@ run "supports_custom_node_group_configuration" {
     )
     error_message = "Custom instance types should be propagated to the node group."
   }
+}
+
+run "supports_restricted_public_endpoint" {
+  command = plan
+
+  variables {
+    endpoint_private_access = true
+    endpoint_public_access  = true
+    public_access_cidrs     = ["203.0.113.10/32"]
+  }
+
+  assert {
+    condition = (
+      aws_eks_cluster.main.vpc_config[0].endpoint_private_access &&
+      aws_eks_cluster.main.vpc_config[0].endpoint_public_access &&
+      contains(aws_eks_cluster.main.vpc_config[0].public_access_cidrs, "203.0.113.10/32")
+    )
+    error_message = "Public endpoint access should be restricted to the configured CIDRs."
+  }
+}
+
+run "rejects_unrestricted_public_endpoint" {
+  command = plan
+
+  variables {
+    endpoint_public_access = true
+    public_access_cidrs    = ["0.0.0.0/0"]
+  }
+
+  expect_failures = [aws_eks_cluster.main]
+}
+
+run "rejects_invalid_node_group_scaling" {
+  command = plan
+
+  variables {
+    desired_nodes = 4
+    min_nodes     = 1
+    max_nodes     = 3
+  }
+
+  expect_failures = [aws_eks_node_group.main]
 }
 
 run "attaches_required_managed_policies" {

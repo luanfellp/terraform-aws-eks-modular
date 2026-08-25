@@ -1,5 +1,6 @@
 resource "aws_iam_role" "cluster" {
   name = "${var.cluster_name}-control-plane-role"
+  tags = var.tags
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -17,18 +18,41 @@ resource "aws_iam_role_policy_attachment" "cluster_policy" {
 }
 
 resource "aws_eks_cluster" "main" {
-  name     = var.cluster_name
-  role_arn = aws_iam_role.cluster.arn
+  name                      = var.cluster_name
+  role_arn                  = aws_iam_role.cluster.arn
+  version                   = var.kubernetes_version
+  enabled_cluster_log_types = var.enabled_cluster_log_types
+  tags                      = var.tags
 
   vpc_config {
-    subnet_ids = var.subnet_ids
+    subnet_ids              = var.subnet_ids
+    endpoint_private_access = var.endpoint_private_access
+    endpoint_public_access  = var.endpoint_public_access
+    public_access_cidrs     = var.endpoint_public_access ? var.public_access_cidrs : null
   }
 
   depends_on = [aws_iam_role_policy_attachment.cluster_policy]
+
+  lifecycle {
+    precondition {
+      condition     = var.endpoint_private_access || var.endpoint_public_access
+      error_message = "Ao menos um endpoint do EKS, privado ou público, deve estar habilitado."
+    }
+
+    precondition {
+      condition = !var.endpoint_public_access || (
+        length(var.public_access_cidrs) > 0 &&
+        !contains(var.public_access_cidrs, "0.0.0.0/0") &&
+        !contains(var.public_access_cidrs, "::/0")
+      )
+      error_message = "O endpoint público exige CIDRs explícitos e não permite acesso irrestrito."
+    }
+  }
 }
 
 resource "aws_iam_role" "node_group" {
   name = "${var.cluster_name}-node-group-role"
+  tags = var.tags
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -61,6 +85,7 @@ resource "aws_eks_node_group" "main" {
   node_role_arn   = aws_iam_role.node_group.arn
   subnet_ids      = var.subnet_ids
   instance_types  = var.instance_types
+  tags            = var.tags
 
   scaling_config {
     desired_size = var.desired_nodes
@@ -73,4 +98,11 @@ resource "aws_eks_node_group" "main" {
     aws_iam_role_policy_attachment.node_cni_policy,
     aws_iam_role_policy_attachment.node_registry_policy
   ]
+
+  lifecycle {
+    precondition {
+      condition     = var.min_nodes <= var.desired_nodes && var.desired_nodes <= var.max_nodes
+      error_message = "A escala do node group deve respeitar min_nodes <= desired_nodes <= max_nodes."
+    }
+  }
 }
