@@ -726,6 +726,9 @@ cria:
 - IAM Role dos nodes
 - Managed Node Group
 - policies IAM necessárias aos workers
+- endpoint da API privado por padrão
+- validação de CIDRs quando o endpoint público é habilitado
+- logs do control plane habilitados por padrão
 
 Exemplo:
 
@@ -740,9 +743,22 @@ module "eks" {
   max_nodes      = 3
   instance_types = ["t3.medium"]
 
+  endpoint_private_access = true
+  endpoint_public_access  = false
+
   depends_on = [module.vpc]
 }
 ```
+
+Para permitir acesso público administrativo, informe explicitamente CIDRs restritos:
+
+```hcl
+endpoint_private_access = true
+endpoint_public_access  = true
+public_access_cidrs     = ["203.0.113.10/32"]
+```
+
+O módulo rejeita `0.0.0.0/0` e `::/0` no endpoint público. Os cinco tipos de logs do control plane são enviados ao CloudWatch por padrão e podem ser ajustados por `enabled_cluster_log_types`.
 
 ---
 
